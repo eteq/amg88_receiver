@@ -1,15 +1,15 @@
-// rf69 demo tx rx.pde
 // -*- mode: C++ -*-
-// Example sketch showing how to create a simple messageing client
-// with the RH_RF69 class. RH_RF69 class does not provide for addressing or
-// reliability, so you should only use RH_RF69  if you do not need the higher
-// level messaging abilities.
-// It is designed to work with the other example rf69_server.
-// Demonstrates the use of AES encryption, setting the frequency and modem 
-// configuration
+
+// parameters
+#define SEND_DELAY 20
+#define LOOP_DELAY 100  // beyond blinking
+#define MY_ADDRESS 2
+#define HOST_ADDRESS 1
+
 
 #include <SPI.h>
 #include <RH_RF69.h>
+#include <RHReliableDatagram.h>
 #include <Wire.h>
 #include <Adafruit_AMG88xx.h>
 
@@ -69,15 +69,11 @@
 
 // Singleton instance of the radio driver
 RH_RF69 rf69(RFM69_CS, RFM69_INT);
-int16_t packetnum = 0;  // packet counter, we increment per xmission
+RHReliableDatagram rf69_manager(rf69, MY_ADDRESS);
 
 // IR sensor
 Adafruit_AMG88xx amg;
 #define AMG_88xx_ROW_LEN 8
-
-// 
-#define SEND_DELAY 20
-#define LOOP_DELAY 100  // beyond blinking
 
 void setup() 
 {
@@ -97,10 +93,12 @@ void setup()
   digitalWrite(RFM69_RST, LOW);
   delay(10);
   
-  if (!rf69.init()) {
+  if (!rf69_manager.init()) {
     Serial.println("RFM69 radio init failed");
     while (1);
   }
+  rf69_manager.setTimeout(100);
+  rf69_manager.setRetries(8);
   Serial.println("RFM69 radio init OK!");
   
   // Defaults after init are 434.0MHz, modulation GFSK_Rb250Fd250, +13dbM (for low power module)
@@ -136,7 +134,104 @@ void setup()
   } Serial.println();
 }
 
+
+uint8_t recv_buf[RH_RF69_MAX_MESSAGE_LEN];
+
 void loop() {
+  uint8_t from, len = sizeof(recv_buf);
+  
+  if (rf69_manager.recvfromAckTimeout(recv_buf, &len, 2000, &from)) {
+    recv_buf[len] = 0; // zero out remaining string
+      
+    Serial.print("Got message from #"); Serial.print(from);
+    Serial.print(" RSSI :");
+    Serial.print(rf69.lastRssi());
+    Serial.println("");     
+    if ((len > 0) && (from == HOST_ADDRESS)) {
+      Serial.print("Got message from HOST: ");
+      Serial.println((char*)recv_buf);
+      if (recv_buf[0] == 't') {
+        delay(150); // give receiver time to be prepared
+        sendPixels();
+      }
+    }
+    
+  blink(LED, 30, 2); 
+  delay(LOOP_DELAY);
+   } else {
+    Serial.println("timed out. Looping around");
+   }
+}
+
+void sendPixels() {
+  int i, j, row, pix4;
+  float pixels[AMG88xx_PIXEL_ARRAY_SIZE];
+  byte message[2*AMG_88xx_ROW_LEN+2];
+  message[0] = 42;
+  
+  amg.readPixels(pixels);
+
+  for (i=0; i<AMG88xx_PIXEL_ARRAY_SIZE; i++)  {
+    row = i/AMG_88xx_ROW_LEN;
+    j = i%AMG_88xx_ROW_LEN;
+    if (j == 0) {
+      message[1] = row; 
+    }
+    pix4 = (int) (pixels[i] * 4);
+    message[2*j+2] = lowByte(pix4);
+    message[2*j+3] = highByte(pix4);
+    if (j+1 == AMG_88xx_ROW_LEN) {
+      // send
+      Serial.println("sending:");
+      for (int k=0; k<(2*AMG_88xx_ROW_LEN+2); k++)  {
+        Serial.print((int)message[k]);
+        Serial.print(", ");
+      } Serial.println("");
+      
+    
+      if (!rf69_manager.sendtoWait((uint8_t *)message, 2*AMG_88xx_ROW_LEN+2, HOST_ADDRESS)) {
+        Serial.print("Sending failed (no ack) on row number ");
+        Serial.println(row);
+        break;
+      }  // otherwise keep going
+    }
+  }
+}
+
+
+int16_t packetnum = 0;
+void ploop() {
+  delay(1000);
+
+  char radiopacket[20];
+
+  (String("Hello World ") + String(packetnum++)).toCharArray(radiopacket, 20);
+  
+  Serial.print("Sending "); Serial.println(radiopacket);
+  
+  // Send a message to the DESTINATION!
+  if (rf69_manager.sendtoWait((uint8_t *)radiopacket, strlen(radiopacket), HOST_ADDRESS)) {
+    // Now wait for a reply from the server
+    uint8_t len = sizeof(recv_buf);
+    uint8_t from;   
+    if (rf69_manager.recvfromAckTimeout(recv_buf, &len, 2000, &from)) {
+      recv_buf[len] = 0; // zero out remaining string
+      
+      Serial.print("Got reply from #"); Serial.print(from);
+      Serial.print(" [RSSI :");
+      Serial.print(rf69.lastRssi());
+      Serial.print("] : ");
+      Serial.println((char*)recv_buf);     
+      blink(LED, 40, 3); //blink LED 3 times, 40ms between blinks
+    } else {
+      Serial.println("No reply, is anyone listening?");
+    }
+  } else {
+    Serial.println("Sending failed (no ack)");
+  }
+}
+
+void nloop() {
   int i, j, row, pix4;
   float pixels[AMG88xx_PIXEL_ARRAY_SIZE];
   byte message[2*AMG_88xx_ROW_LEN+2];
