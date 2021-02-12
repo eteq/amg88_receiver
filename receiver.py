@@ -20,7 +20,7 @@ class AMG88xxReceiver:
         spi = busio.SPI(sck, MOSI=mosi, MISO=miso)
 
         rfm69 = adafruit_rfm69.RFM69(spi, cs, reset, freq,
-                                    encryption_key=DEFAULT_ENCRYPTION)
+                                     encryption_key=DEFAULT_ENCRYPTION)
         print('rfm69 started')
         self.rfm69 = rfm69
 
@@ -118,3 +118,38 @@ class AMG88xxReceiver:
 
         if savefn:
             fig.savefig(savefn)
+
+import time
+def test_reliable_datagram():
+    rfm69 = AMG88xxReceiver().rfm69
+
+    rfm69.ack_delay = None
+    rfm69.ack_wait = 0.0
+    rfm69.node = 1
+    rfm69.destination = 2
+    rfm69.receive_timeout = 1
+
+    counter = 0
+    while True:
+        st = time.time()
+        print("Transmitting request for temperature")
+        # if not rfm69.send_with_ack(b't'):
+        #     print('Temp request failed to ack! Trying again shortly')
+        #     time.sleep(1)
+        #     continue
+        print('sent', rfm69.send_with_ack(b't'))
+
+        packets = []
+        print("Waiting for packets...")
+        for i in range(8):
+            packet = rfm69.receive(keep_listening=True, with_ack=True)
+            if packet is None:
+                break
+            else:
+                packets.append(packet)
+        else:
+            rfm69.idle()
+            et = time.time()
+            print('Finished a whole array in', et-st, 'secs.',counter,'Done sucessfully!')
+            counter += 1
+            time.sleep(1)
