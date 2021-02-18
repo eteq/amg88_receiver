@@ -15,16 +15,13 @@ while not sta_if.isconnected():
     if time_passed >= timeout_ms:
         sta_if.disconnect()
         break
-# blink once if connect succeeded, twice if failes
+# blink once if connect succeeded, twice if fails
 led_pin = machine.Pin(13, machine.Pin.OUT)
 if sta_if.isconnected():
     print('Wifi connected')
     led_pin.value(1)
     utime.sleep_ms(200)
     led_pin.value(0)
-
-    from utils import set_time_from_nist
-    set_time_from_nist()
 else:
     print('Wifi did not connect')
     led_pin.value(1)
@@ -37,3 +34,9 @@ else:
 
 import webrepl
 webrepl.start()                   # Check for successful connection
+
+
+# if we can try to set the RTC
+if sta_if.isconnected():
+    from utils import set_time_from_nist
+    set_time_from_nist()
