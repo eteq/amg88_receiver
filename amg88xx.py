@@ -126,7 +126,7 @@ class AMG88XX:
         async with self._async_lock:
             return self.read_pixels(outformat=outformat)
 
-    def get_bmp(self, mindegC=0, maxdegC=80):
+    def get_bmp(self, mindegC=0, maxdegC=80, intpixels=None):
         """Create and return a grayscale BMP file.
 
         Args:
@@ -139,7 +139,10 @@ class AMG88XX:
         scaleint = 255/(maxint-minint)
         remap_elem = lambda e: max(min(scaleint*(e - minint), 255), 0)
 
-        pixels = [[round(remap_elem(elem)) for elem in row]for row in self.read_pixels('int')]
+        if intpixels is None:
+            intpixels = self.read_pixels('int')
+
+        pixels = [[round(remap_elem(elem)) for elem in row]for row in intpixels]
 
         height = len(pixels)
         width = len(pixels[0])
@@ -227,3 +230,22 @@ def _int32_to_bytes(i):
                   i >> 8 & 0xff,
                   i >> 16 & 0xff,
                   i >> 24 & 0xff))
+
+def stats_from_pixels(pixels):
+    dct = {}
+    mx = -1000000000
+    mn = 1000000000
+    total = n = 0
+    for row in pixels:
+        for elem in row:
+            if elem > mx:
+                mx = elem
+            if elem < mn:
+                mn = elem
+            total += elem
+            n += 1
+
+    dct['average'] = total / n
+    dct['min'] = mn
+    dct['max'] = mx
+    return dct

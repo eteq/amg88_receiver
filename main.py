@@ -1,16 +1,37 @@
 import os
-import picoweb
-from amg88xx import AMG88XX
+import ubinascii
+from machine import Pin
+from utime import sleep_ms
 
-amg = AMG88XX(None)
+import picoweb
+import amg88xx
+
+led = Pin(13, Pin.OUT, value=0)
+
+amg = amg88xx.AMG88XX(None)
 i2c = amg.i2c
 
 
 app = picoweb.WebApp(__name__)
 
 @app.route("/")
+@app.route("/index.html")
 def index(req, resp):
-    pass
+    req.parse_qs()
+    mindegC=int(req.form.get('min', 0))
+    maxdegC=int(req.form.get('max', 80))
+
+    yield from picoweb.start_response(resp)
+    pixels = await amg.aread_pixels('int')
+
+    bmpb64 = ubinascii.b2a_base64(amg.get_bmp(intpixels=pixels, mindegC=mindegC, maxdegC=maxdegC))
+    stats = amg88xx.stats_from_pixels(pixels)
+    yield from app.render_template(resp, "index.tpl", (stats['average']/4,
+                                                       stats['min']/4,
+                                                       stats['max']/4,
+                                                       bmpb64.decode(),
+                                                       mindegC,
+                                                       maxdegC))
 
 @app.route("/pixels")
 def pixels(req, resp):
@@ -24,21 +45,7 @@ def pixels(req, resp):
     dct = {'pixels':pixels, 'units':outformat}
 
     if 'stats' in req.form and req.form['stats'] not in ('0', 'false', 'False'):
-        mx = -1000000000
-        mn = 1000000000
-        total = n = 0
-        for row in pixels:
-            for elem in row:
-                if elem > mx:
-                    mx = elem
-                if elem < mn:
-                    mn = elem
-                total += elem
-                n += 1
-
-        dct['average'] = total / n
-        dct['min'] = mn
-        dct['max'] = mx
+        dct.update(amg88xx.stats_from_pixels(pixels))
 
     yield from picoweb.jsonify(resp, dct)
 
@@ -57,4 +64,10 @@ def bmp(req, resp):
     yield from resp.awrite(bmpbytes)
 
 if __name__ == "__main__":
+    for i in range(3):
+        led.on()
+        sleep_ms(75)
+        led.off()
+        sleep_ms(75)
+
     app.run(host='0.0.0.0', debug='debug' in os.listdir('/'), port=80)
