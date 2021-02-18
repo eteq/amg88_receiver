@@ -16,7 +16,7 @@ Max: {{max}}<br>
   <label for="min">Image Min:</label><br>
   <input type="text" id="min" name="min" value="{{minimage}}"><br>
   <label for="max">Image Max:</label><br>
-  <input type="text" id="max" name="max" value="{{maximage}}">
+  <input type="text" id="max" name="max" value="{{maximage}}"><br>
   <input type="submit" />
 </form>
 
