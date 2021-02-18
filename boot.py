@@ -22,6 +22,9 @@ if sta_if.isconnected():
     led_pin.value(1)
     utime.sleep_ms(200)
     led_pin.value(0)
+
+    from utils import set_time_from_nist
+    set_time_from_nist()
 else:
     print('Wifi did not connect')
     led_pin.value(1)

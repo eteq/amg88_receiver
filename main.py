@@ -1,12 +1,16 @@
 import os
 import ubinascii
-from machine import Pin
+from machine import Pin, ADC, RTC
 from utime import sleep_ms
 
 import picoweb
+
 import amg88xx
+import utils
 
 led = Pin(13, Pin.OUT, value=0)
+battery_adc = ADC(Pin(35, Pin.IN))
+battery_adc.atten(ADC.ATTN_11DB)
 
 amg = amg88xx.AMG88XX(None)
 i2c = amg.i2c
@@ -62,6 +66,14 @@ def bmp(req, resp):
     yield from picoweb.start_response(resp, "image/bmp",
                                       headers={'Content-Length':str(len(bmpbytes))})
     yield from resp.awrite(bmpbytes)
+
+@app.route("/battery")
+def battery(req, resp):
+    #read_volts = utils.ADC_to_voltage(battery_adc.read(), 11) # off by ~5-10% ?
+    read_volts = battery_adc.read()*3.6/4095  # this seems to be ok to ~1% when comparing to multimeter...
+    dt = RTC().datetime()
+    yield from picoweb.jsonify(resp, {'battery_value':read_volts*2, 'units':'V', 'datetime_stamp':dt})
+
 
 if __name__ == "__main__":
     for i in range(3):
