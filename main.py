@@ -22,8 +22,9 @@ app = picoweb.WebApp(__name__)
 @app.route("/index.html")
 def index(req, resp):
     req.parse_qs()
-    mindegC=int(req.form.get('min', 0))
-    maxdegC=int(req.form.get('max', 80))
+    mindegC = int(req.form.get('min', 0))
+    maxdegC = int(req.form.get('max', 80))
+    refreshms = float(req.form.get('refreshms', -1))
 
     yield from picoweb.start_response(resp)
     pixels = await amg.aread_pixels('int')
@@ -35,7 +36,8 @@ def index(req, resp):
                                                        stats['max']/4,
                                                        bmpb64.decode(),
                                                        mindegC,
-                                                       maxdegC))
+                                                       maxdegC,
+                                                       refreshms))
 
 @app.route("/pixels")
 def pixels(req, resp):
@@ -61,10 +63,21 @@ def thermistor(req, resp):
 @app.route("/bmp")
 def bmp(req, resp):
     req.parse_qs()
-    bmpbytes = await amg.aget_bmp(mindegC=int(req.form.get('mindegC', 0)),
-                                  maxdegC=int(req.form.get('maxdegC', 80)))
+    pixels = await amg.aread_pixels('int')
+    bmpbytes = amg.get_bmp(intpixels=pixels,
+                           mindegC=int(req.form.get('mindegC', 0)),
+                           maxdegC=int(req.form.get('maxdegC', 80)))
+    response_headers = {'Content-Length':str(len(bmpbytes)),
+                        'Cache-Control': 'no-cache, no-store, must-revalidate'}
+
+    if req.form.get('stats', None):
+        stats = amg88xx.stats_from_pixels(pixels)
+        response_headers['X-pixavg'] = str(stats['average']/4)
+        response_headers['X-pixmin'] = str(stats['min']/4)
+        response_headers['X-pixmax'] = str(stats['max']/4)
+
     yield from picoweb.start_response(resp, "image/bmp",
-                                      headers={'Content-Length':str(len(bmpbytes))})
+                                      headers=response_headers)
     yield from resp.awrite(bmpbytes)
 
 @app.route("/battery")
