@@ -82,4 +82,10 @@ if __name__ == "__main__":
         led.off()
         sleep_ms(75)
 
+    # delete compiled templates if they exist
+    if 'templates' in os.listdir():
+        for fn in os.listdir('templates'):
+            if fn.endswith('.py'):
+                os.remove('templates/' + fn)
+
     app.run(host='0.0.0.0', debug='debug' in os.listdir('/'), port=80)
