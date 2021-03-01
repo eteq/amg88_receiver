@@ -102,7 +102,7 @@ class AMG88XX:
         rows = []
         for i in range(8):
             row = []
-            offset = i*8
+            offset = i*16
             for j in range(8):
                 j2 = j*2
                 low = pixel_bytes[offset + j2]
