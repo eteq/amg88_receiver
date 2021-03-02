@@ -130,19 +130,36 @@ class AMG88XX:
         """Create and return a grayscale BMP file.
 
         Args:
-            pixels: A rectangular image stored as a sequence of rows.
+            intpixels: A rectangular image stored as a sequence of rows.
                 Each row must be an iterable series of integers in the
                 range 0-255.
+            mindegC: the buttom temp for the image.  If None, will use the min
+            maxdegC: the buttom temp for the image.  If None, will use the max
         """
-        minint = mindegC * 4
-        maxint = maxdegC * 4
-        scaleint = 255/(maxint-minint)
-        remap_elem = lambda e: max(min(scaleint*(e - minint), 255), 0)
-
         if intpixels is None:
             intpixels = self.read_pixels('int')
 
-        pixels = [[round(remap_elem(elem)) for elem in row]for row in intpixels]
+        if mindegC is None or mindegC is None:
+            minint = 10000
+            maxint = -10000
+            for row in intpixels:
+                for elem in row:
+                    if elem < minint:
+                        minint = elem
+                    if elem > maxint:
+                        maxint = elem
+            if mindegC is not None:
+                minint = mindegC * 4
+            if maxdegC is not None:
+                maxint = maxdegC * 4
+        else:
+            minint = mindegC * 4
+            maxint = maxdegC * 4
+
+        scaleint = 255/(maxint-minint)
+        remap_elem = lambda e: max(min(scaleint*(e - minint), 255), 0)
+
+        pixels = [[round(remap_elem(elem)) for elem in row] for row in intpixels]
 
         height = len(pixels)
         width = len(pixels[0])

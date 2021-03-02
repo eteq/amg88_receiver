@@ -8,9 +8,10 @@
 
 <a href="/bmp"><img id="irimage" src="data:image/bmp;base64,{{bmpb64}}" alt="IR image" width="512" height="512"></a>
 <br>
-Average: {{avg}}<br>
-Min: {{min}}<br>
-Max: {{max}}<br>
+
+<p id="avg">Average: {{avg}}</p>
+<p id="min">Min: {{min}}</p>
+<p id="max">Max: {{max}}</p>
 
 <form action="/index.html" method="GET">
   <label for="min">Image Min:</label><br>
@@ -23,14 +24,29 @@ Max: {{max}}<br>
 </form>
 {% if refreshms >= 0 %}
 <script>
+
+var irimage = document.getElementById("irimage");
+
 function refreshBMP() {
-  var irimage = document.getElementById("irimage");
-  if (irimage.complete) {
-    irimage.src = "/bmp?mindegC={{minimage}}&maxdegC={{maximage}}&" + new Date().getTime();
-  }
-  setTimeout(refreshBMP, {{refreshms}});
+  var xhr = new XMLHttpRequest();
+  xhr.onload = function() {
+    var reader = new FileReader();
+    reader.onloadend = function() {
+      irimage.src = reader.result;
+    }
+    reader.readAsDataURL(xhr.response);
+    document.getElementById("avg").innerHTML = 'Average: '+xhr.getResponseHeader('x-pixavg');
+    document.getElementById("min").innerHTML = 'Min: '+xhr.getResponseHeader('x-pixmin');
+    document.getElementById("max").innerHTML = 'Max: '+xhr.getResponseHeader('x-pixmax');
+    setTimeout(refreshBMP, {{refreshms}});
+  };
+  xhr.open('GET', "/bmp?mindegC={{minimage}}&maxdegC={{maximage}}&stats=1&time=" + new Date().getTime());
+  xhr.responseType = 'blob';
+  xhr.send();
 }
+
 setTimeout(refreshBMP, {{refreshms}});
+
 </script>
 {% endif %}
 

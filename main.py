@@ -22,9 +22,17 @@ app = picoweb.WebApp(__name__)
 @app.route("/index.html")
 def index(req, resp):
     req.parse_qs()
-    mindegC = int(req.form.get('min', 0))
-    maxdegC = int(req.form.get('max', 80))
     refreshms = float(req.form.get('refreshms', -1))
+    mindegC = req.form.get('min', 0)
+    maxdegC = req.form.get('max', 80)
+    if mindegC in ('auto', 'None'):
+        mindegC = None
+    else:
+        mindegC = int(mindegC)
+    if maxdegC in ('auto', 'None'):
+        maxdegC = None
+    else:
+        maxdegC = int(maxdegC)
 
     yield from picoweb.start_response(resp)
     pixels = await amg.aread_pixels('int')
@@ -63,10 +71,22 @@ def thermistor(req, resp):
 @app.route("/bmp")
 def bmp(req, resp):
     req.parse_qs()
+    mindegC = req.form.get('mindegC', 0)
+    maxdegC = req.form.get('maxdegC', 80)
+    print('minmx', repr(mindegC), repr(maxdegC))
+    if mindegC in ('auto', 'None'):
+        mindegC = None
+    else:
+        mindegC = int(mindegC)
+    if maxdegC in ('auto', 'None'):
+        maxdegC = None
+    else:
+        maxdegC = int(maxdegC)
+
     pixels = await amg.aread_pixels('int')
-    bmpbytes = amg.get_bmp(intpixels=pixels,
-                           mindegC=int(req.form.get('mindegC', 0)),
-                           maxdegC=int(req.form.get('maxdegC', 80)))
+
+    bmpbytes = amg.get_bmp(intpixels=pixels, mindegC=mindegC, maxdegC=maxdegC)
+
     response_headers = {'Content-Length':str(len(bmpbytes)),
                         'Cache-Control': 'no-cache, no-store, must-revalidate'}
 
